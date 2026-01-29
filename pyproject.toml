@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "textual-calendar"
+description = "A calendar date/time picker widget for Textual UI."
+version = "1.0.0"
+requires-python = ">=3.11"
+license.text = "BSD-3-Clause"
+license-files = ["LICENSE"]
+keywords = [
+  "textual",
+  "widget",
+  "datetime",
+  "tui",
+  "python",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3 :: Only",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "Topic :: Software Development :: User Interfaces",
+]
+readme = "README.md"
+authors = [
+  {name = "Thiago Costa", email = "admin@rootbsd.info"},
+]
+dependencies = [
+  "textual>=7.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["textual_calendar"]
+
+[project.optional-dependencies]
+dev = [
+  "mypy",
+  "pylint",
+  "pylint-per-file-ignores",
+]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+mypy_path = "src"
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pylint]
+disable = [
+  "missing-module-docstring",
+]
+
