@@ -1,11 +1,14 @@
 
 import locale
+import re
 from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import NamedTuple, Optional
 
 from textual.app import ComposeResult
+from textual.css.query import NoMatches
+from textual.events import Click
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
@@ -176,7 +179,7 @@ class Calendar(Widget, can_focus=True):
             return None
         return date(self.calendar_date.year, self.calendar_date.month, self.calendar_date.day)
 
-    def _build_calendar(self) -> None:
+    async def _build_calendar(self) -> None:
         """
         Rebuild calendar days for selected month/year.
         """
@@ -188,7 +191,9 @@ class Calendar(Widget, can_focus=True):
         self.query_one(".calendar-header", Label).update(f'{month_str} {self.calendar_date.year}')
 
         # Remove current calendar days before build a new one
-        self.query(".calendar-day").remove()
+        await self.query(".calendar-day").remove()
+
+        day_widgets: list[Label] = []
 
         # Add previous month's trailing days
         for day_offset in range(1, month_range.first_weekday):
@@ -196,54 +201,67 @@ class Calendar(Widget, can_focus=True):
                 month_range.previous_month.days_count
                 - month_range.first_weekday
                 + day_offset + 1)
-            func_call = (
-                "select_calendar("
-                f"{month_range.previous_month.year}, "
-                f"{month_range.previous_month.month}, "
-                f"{day_num})")
             day = Label(
-                f"[@click={func_call}]{day_num:02}[/]",
+                f"{day_num:02}", id=("calendar-day-"
+                    f"{month_range.previous_month.year}-"
+                    f"{month_range.previous_month.month}-"
+                    f"{day_num}"),
                 classes="calendar-day calendar-day-prev-month")
             if date(
                     month_range.previous_month.year,
                     month_range.previous_month.month,
                     day_num) == today:
                 day.add_class("calendar-day-today")
-            self.mount(day)
+            day_widgets.append(day)
 
         # Add current month days
         current_month = (
             today.year == self.calendar_date.year
             and today.month == self.calendar_date.month)
         for day_num in range(1, month_range.month_days + 1):
-            func_call = f"select_day({day_num})"
-            day = Label(f"[@click={func_call}]{day_num:02}[/]", classes="calendar-day")
+            day = Label(
+                f"{day_num:02}",
+                id=f"calendar-day-{self.calendar_date.year}-{self.calendar_date.month}-{day_num}",
+                classes="calendar-day")
             if current_month and day_num == today.day:
                 day.add_class("calendar-day-today")
             if self.calendar_date.day == day_num:
                 day.add_class("calendar-day-selected")
-            self.mount(day)
+            day_widgets.append(day)
 
         # Add next month's leading days (to complete all 42 calendar cells)
         remaining_days = 42 - (month_range.first_weekday - 1 + month_range.month_days)
         for day_num in range(1, remaining_days + 1):
-            func_call = (
-                "select_calendar("
-                f"{month_range.next_month.year}, "
-                f"{month_range.next_month.month}, "
-                f"{day_num})")
             day = Label(
-                f"[@click={func_call}]{day_num:02}[/]",
+                f"{day_num:02}", id=("calendar-day-"
+                    f"{month_range.next_month.year}-"
+                    f"{month_range.next_month.month}-"
+                    f"{day_num}"),
                 classes="calendar-day calendar-day-next-month")
             if date(month_range.next_month.year, month_range.next_month.month, day_num) == today:
                 day.add_class("calendar-day-today")
-            self.mount(day)
+            day_widgets.append(day)
 
-    def on_mount(self) -> None:
+        await self.mount_all(day_widgets)
+
+    async def on_mount(self) -> None:
         """
         Run mount event to this widget.
         """
-        self._build_calendar()
+        await self._build_calendar()
+
+    def on_click(self, event: Click) -> None:
+        """
+        Handle mouse clicks on calendar.
+        """
+        day, _ = self.screen.get_widget_at(*event.screen_offset)
+
+        if isinstance(day, Label) and "calendar-day" in day.classes and day.id is not None:
+            m = re.fullmatch(r"calendar-day-(\d+)-(\d+)-(\d+)", day.id)
+            if m:
+                event.stop()
+                self.action_select_calendar(int(m[1]), int(m[2]), int(m[3]))
+
 
     def action_select_calendar(self, year: int, month: int, day: int) -> None:
         """
@@ -295,7 +313,7 @@ class Calendar(Widget, can_focus=True):
             next_date += timedelta(days=1)
             self.calendar_date = CalendarDate(next_date.year, next_date.month, next_date.day)
 
-    def watch_calendar_date(self, old_date: CalendarDate, new_date: CalendarDate) -> None:
+    async def watch_calendar_date(self, old_date: CalendarDate, new_date: CalendarDate) -> None:
         """
         Watch for changes in selected date.
         
@@ -303,7 +321,17 @@ class Calendar(Widget, can_focus=True):
         :param new_date: New changed date.
         """
         if old_date != new_date:
-            self._build_calendar()
             date_value = self.selected_date
             if date_value is not None:
                 self.post_message(self.Selected(self, date_value))
+            if old_date.year != new_date.year or old_date.month != new_date.month:
+                await self._build_calendar()
+            elif new_date.day is not None:
+                self.query(".calendar-day").remove_class("calendar-day-selected")
+                try:
+                    day = self.get_child_by_id(
+                        f"calendar-day-{new_date.year}-{new_date.month}-{new_date.day}")
+                except NoMatches:
+                    await self._build_calendar()
+                else:
+                    day.add_class("calendar-day-selected")
