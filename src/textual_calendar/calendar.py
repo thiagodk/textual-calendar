@@ -142,6 +142,10 @@ class Calendar(Widget, can_focus=True):
     BINDINGS = [
         ("left", "previous_day()", "Previous Day"),
         ("right", "next_day()", "Next Day"),
+        ("up", "previous_month()", "Previous Month"),
+        ("down", "next_month()", "Next Month"),
+        ("pageup", "previous_year()", "Previous Year"),
+        ("pagedown", "next_year()", "Next Year"),
     ]
 
     calendar_date: reactive[CalendarDate] = reactive(_default_calendar_date)
@@ -312,6 +316,74 @@ class Calendar(Widget, can_focus=True):
         if next_date is not None:
             next_date += timedelta(days=1)
             self.calendar_date = CalendarDate(next_date.year, next_date.month, next_date.day)
+
+    def action_previous_month(self) -> None:
+        """
+        Action to move selected date to the previous month.
+        """
+        year = self.calendar_date.year
+        month = self.calendar_date.month - 1
+        day = self.calendar_date.day
+
+        if month == 0:
+            month = 12
+            year -= 1
+
+        if day is not None:
+            # Check if we can move same day over the previous month
+            _, month_days = monthrange(year, month)
+            day = min(day, month_days)
+
+        self.calendar_date = CalendarDate(year, month, day)
+
+    def action_next_month(self) -> None:
+        """
+        Action to move selected date to the next month.
+        """
+        year = self.calendar_date.year
+        month = self.calendar_date.month + 1
+        day = self.calendar_date.day
+
+        if month == 13:
+            month = 1
+            year += 1
+
+        if day is not None:
+            # Check if we can move same day over the next month
+            _, month_days = monthrange(year, month)
+            day = min(day, month_days)
+
+        self.calendar_date = CalendarDate(year, month, day)
+
+    def action_previous_year(self) -> None:
+        """
+        Action to move selected date to the previous year.
+        """
+        year = self.calendar_date.year - 1
+        month = self.calendar_date.month
+        day = self.calendar_date.day
+
+        if day is not None:
+            # We have to do this because of leap years
+            _, month_days = monthrange(year, month)
+            day = min(day, month_days)
+
+        self.calendar_date = CalendarDate(year, month, day)
+
+    def action_next_year(self) -> None:
+        """
+        Action to move selected date to the next year.
+        """
+        year = self.calendar_date.year + 1
+        month = self.calendar_date.month
+        day = self.calendar_date.day
+
+        if day is not None:
+            # We have to do this because of leap years
+            _, month_days = monthrange(year, month)
+            day = min(day, month_days)
+
+        self.calendar_date = CalendarDate(year, month, day)
 
     async def watch_calendar_date(self, old_date: CalendarDate, new_date: CalendarDate) -> None:
         """
