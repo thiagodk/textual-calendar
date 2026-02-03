@@ -15,6 +15,10 @@ class CalendarApp(App[None]):
     Example of use of Calendar widget.
     """
 
+    BINDINGS = [
+        ("q", "quit", "Quit"),
+    ]
+
     CSS = """
     Screen {
         align: center middle;
