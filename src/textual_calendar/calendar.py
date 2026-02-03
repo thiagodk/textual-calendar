@@ -7,12 +7,15 @@ from datetime import date, timedelta
 from typing import NamedTuple, Optional
 
 from textual.app import ComposeResult
+from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.events import Click
 from textual.message import Message
 from textual.reactive import reactive
+from textual.screen import ModalScreen
+from textual.validation import Function, Number
 from textual.widget import Widget
-from textual.widgets import Label
+from textual.widgets import Button, Input, Label
 
 
 class CalendarMonth(NamedTuple):
@@ -85,6 +88,171 @@ class _MonthRanges:
             first_weekday, month_days)
 
 
+class SelectCalendar(ModalScreen[Optional[CalendarDate]]):
+    """
+    Date selection dialog.
+
+    Allow user to type an date arbitrarily.
+    """
+
+    DEFAULT_CSS = """
+    SelectCalendar {
+        align: center middle;
+    }
+
+    SelectCalendar > Vertical {
+        background: $surface;
+        border: thick $primary;
+        padding: 1 2;
+        width: auto;
+        height: auto;
+    }
+
+    SelectCalendar Horizontal {
+        width: auto;
+        height: auto;
+        align: center middle;
+    }
+
+    #calendar-input-year {
+        width: 5;
+    }
+
+    #calendar-input-month, #calendar-input-day {
+        width: 3;
+    }
+    """
+
+    BINDINGS = [
+        ("up", "move_up()", "Increment"),
+        ("down", "move_down()", "Decrement"),
+        ("escape", "dismiss(None)", "Cancel"),
+    ]
+
+    input_year: Input
+    input_month: Input
+    input_day: Input
+
+    def compose(self) -> ComposeResult:
+        self.input_year = Input(
+            placeholder="YYYY", type="integer", max_length=4, id="calendar-input-year",
+            compact=True, validators=[Number(minimum=0, maximum=9999)],
+            validate_on=["changed", "blur"])
+        self.input_month = Input(
+            placeholder="MM", type="integer", max_length=2, id="calendar-input-month",
+            compact=True, validators=[Number(1, 12)],
+            validate_on=["changed", "blur"])
+        self.input_day = Input(
+            placeholder="DD", type="integer", max_length=2, id="calendar-input-day",
+            compact=True, validators=[Function(self.validate_day)],
+            validate_on=["changed", "blur"])
+        with Vertical():
+            yield Horizontal(
+                self.input_year,
+                Label("/"),
+                self.input_month,
+                Label("/"),
+                self.input_day)
+            yield Horizontal(
+                Button("Ok", id="calendar-input-ok", variant="success", flat=True),
+                Button("Cancel", id="calendar-input-cancel", variant="warning", flat=True))
+
+    def validate_day(self, value: str) -> bool:
+        """
+        Check for a valid day considering selected year/month.
+        
+        :param value: Input string of a day to be validate
+        :return: Validation result, True if it's valid.
+        """
+        if len(value) == 0:
+            return True
+        try:
+            year = int(self.input_year.value)
+            month = int(self.input_month.value)
+            day = int(value)
+            date(year, month, day)
+        except ValueError:
+            return False
+        return True
+
+    def action_move_up(self) -> None:
+        """
+        Move focused input one unit ahead.
+        """
+        input_widget = self.focused
+        if (not isinstance(input_widget, Input)
+                or not input_widget.is_valid
+                or not input_widget.value):
+            return
+
+        input_value = int(input_widget.value) + 1
+
+        match input_widget.id:
+            case "calendar-input-year":
+                if input_value <= 9999:
+                    input_widget.clear()
+                    input_widget.insert(str(input_value), 0)
+
+            case "calendar-input-month":
+                if input_value <= 12:
+                    input_widget.clear()
+                    input_widget.insert(str(input_value), 0)
+
+            case "calendar-input-day":
+                year = self.query_one("#calendar-input-year", Input)
+                month = self.query_one("#calendar-input-month", Input)
+                if not year.is_valid or not month.is_valid:
+                    return
+                _, month_days = monthrange(int(year.value), int(month.value))
+                if input_value <= month_days:
+                    input_widget.clear()
+                    input_widget.insert(str(input_value), 0)
+
+    def action_move_down(self) -> None:
+        """
+        Move focused input one unit behind.
+        """
+        input_widget = self.focused
+        if (not isinstance(input_widget, Input)
+                or not input_widget.is_valid
+                or not input_widget.value):
+            return
+
+        input_value = int(input_widget.value) - 1
+
+        match input_widget.id:
+            case "calendar-input-year":
+                if input_value >= 0:
+                    input_widget.clear()
+                    input_widget.insert(str(input_value), 0)
+
+            case "calendar-input-month" | "calendar-input-day":
+                if input_value >= 1:
+                    input_widget.clear()
+                    input_widget.insert(str(input_value), 0)
+
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
+        """
+        Handle dialog button press event.
+        """
+        match event.button.id:
+            case "calendar-input-ok":
+                self.input_year.validate(self.input_year.value)
+                self.input_month.validate(self.input_month.value)
+                self.input_day.validate(self.input_day.value)
+
+                if (self.input_year.is_valid and self.input_year.value
+                        and self.input_month.is_valid and self.input_month.value
+                        and self.input_day.is_valid):
+                    self.dismiss(CalendarDate(
+                        int(self.input_year.value),
+                        int(self.input_month.value),
+                        int(self.input_day.value) if self.input_day.value else None))
+
+            case "calendar-input-cancel":
+                self.dismiss(None)
+
+
 class Calendar(Widget, can_focus=True):
     """
     Render a calendar for a selected month/year.
@@ -146,6 +314,7 @@ class Calendar(Widget, can_focus=True):
         ("down", "next_month()", "Next Month"),
         ("pageup", "previous_year()", "Previous Year"),
         ("pagedown", "next_year()", "Next Year"),
+        ("insert", "input_calendar()", "Input Date"),
     ]
 
     calendar_date: reactive[CalendarDate] = reactive(_default_calendar_date)
@@ -266,6 +435,15 @@ class Calendar(Widget, can_focus=True):
                 event.stop()
                 self.action_select_calendar(int(m[1]), int(m[2]), int(m[3]))
 
+    def action_input_calendar(self) -> None:
+        """
+        Action to open calendar input modal screen.
+        """
+        def _update_calendar_from_input(selected_calendar: Optional[CalendarDate]) -> None:
+            if selected_calendar is not None:
+                self.calendar_date = selected_calendar
+        select_calendar_screen = SelectCalendar()
+        self.app.push_screen(select_calendar_screen, _update_calendar_from_input)
 
     def action_select_calendar(self, year: int, month: int, day: int) -> None:
         """
