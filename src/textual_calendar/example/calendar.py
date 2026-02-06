@@ -3,31 +3,17 @@ from datetime import date
 from typing import Optional
 
 from textual import on
-from textual.app import App, ComposeResult
+from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label
 
+from .base import ExampleApp
 from ..calendar import Calendar
 
 
-class CalendarApp(App[None]):
+class CalendarApp(ExampleApp):
     """
     Example of use of Calendar widget.
-    """
-
-    BINDINGS = [
-        ("q", "quit", "Quit"),
-    ]
-
-    CSS = """
-    Screen {
-        align: center middle;
-    }
-
-    Vertical {
-        width: auto;
-        height: auto;
-    }
     """
 
     def compose(self) -> ComposeResult:

@@ -1,28 +1,13 @@
 
-from textual.app import App, ComposeResult
+from textual.app import ComposeResult
 from textual.containers import Vertical
 
+from .base import ExampleApp
 from ..time import Time
 
-class TimeApp(App[None]):
+class TimeApp(ExampleApp):
     """
     Example use of Time widget.
-    """
-
-    BINDINGS = [
-        ("q", "quit", "Quit"),
-    ]
-
-    CSS = """
-    Screen {
-        align: center middle;
-    }
-
-    Screen > Vertical {
-        border: double blue;
-        width: auto;
-        height: auto;
-    }
     """
 
     def compose(self) -> ComposeResult:
