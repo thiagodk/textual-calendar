@@ -1,6 +1,6 @@
 
 from datetime import time
-from typing import Literal, NamedTuple, Optional
+from typing import Any, Literal, NamedTuple, Optional
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -128,7 +128,12 @@ class Time(Widget, can_focus=True):
         self.clock.second.update(f"{new_time.second:02}")
         self._update_time_if_changed()
 
-    def __init__(self, *children, initial_time: Optional[time] = None, **kwargs) -> None:
+    def __init__(
+        self,
+        *children: Widget,
+        initial_time: Optional[time] = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(*children, **kwargs)
         self.initial_time = initial_time
 
