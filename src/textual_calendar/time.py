@@ -128,11 +128,16 @@ class Time(Widget, can_focus=True):
         self.clock.second.update(f"{new_time.second:02}")
         self._update_time_if_changed()
 
+    def __init__(self, *children, initial_time: Optional[time] = None, **kwargs) -> None:
+        super().__init__(*children, **kwargs)
+        self.initial_time = initial_time
+
     def compose(self) -> ComposeResult:
+        initial_time = time(0, 0, 0) if self.initial_time is None else self.initial_time
         self.clock = ClockDigits(
-            Digits("00", classes="time-number", id="time-hour"),
-            Digits("00", classes="time-number", id="time-minute"),
-            Digits("00", classes="time-number", id="time-second"))
+            Digits(f"{initial_time.hour:02}", classes="time-number", id="time-hour"),
+            Digits(f"{initial_time.minute:02}", classes="time-number", id="time-minute"),
+            Digits(f"{initial_time.second:02}", classes="time-number", id="time-second"))
         with Vertical():
             yield Horizontal(
                 self.clock.hour,
