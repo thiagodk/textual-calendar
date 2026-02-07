@@ -352,6 +352,15 @@ class Calendar(Widget, can_focus=True):
             return None
         return date(self.calendar_date.year, self.calendar_date.month, self.calendar_date.day)
 
+    @selected_date.setter
+    def selected_date(self, date_value: date) -> None:
+        """
+        Set calendar to a specific data from python native date object.
+        
+        :param date_value: Python date object to set this calendar.
+        """
+        self.calendar_date = CalendarDate(date_value.year, date_value.month, date_value.day)
+
     async def _build_calendar(self) -> None:
         """
         Rebuild calendar days for selected month/year.
