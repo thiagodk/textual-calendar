@@ -116,6 +116,18 @@ class Time(Widget, can_focus=True):
         except ValueError:
             return None
 
+    @time_value.setter
+    def time_value(self, new_time: time) -> None:
+        """
+        Set widget time to a specific time.
+
+        :param new_time: Set widget time to this time object.
+        """
+        self.clock.hour.update(f"{new_time.hour:02}")
+        self.clock.minute.update(f"{new_time.minute:02}")
+        self.clock.second.update(f"{new_time.second:02}")
+        self._update_time_if_changed()
+
     def compose(self) -> ComposeResult:
         self.clock = ClockDigits(
             Digits("00", classes="time-number", id="time-hour"),
