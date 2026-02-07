@@ -4,6 +4,7 @@ from typing import Literal, NamedTuple, Optional
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.events import Click
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
@@ -197,6 +198,28 @@ class Time(Widget, can_focus=True):
         if time_value is not None and time_value != self.last_time_value:
             self.last_time_value = time_value
 
+    def on_click(self, event: Click) -> None:
+        """
+        Handle mouse clicks on clock digits.
+        """
+        time_number, _ = self.screen.get_widget_at(*event.screen_offset)
+        valid_time_id = ("time-hour", "time-minute", "time-second")
+        query = self.query("Digits.time-number-selected")
+        selected_time_number = query[0] if len(query) else None
+
+        if isinstance(time_number, Digits) and (
+                "time-number" in time_number.classes and
+                time_number.id in valid_time_id):
+            event.stop()
+            if selected_time_number is not None and selected_time_number != time_number:
+                assert isinstance(selected_time_number, Digits)
+                self._remove_selection(selected_time_number)
+                time_number.add_class("time-number-selected")
+        elif selected_time_number is not None:
+            # Deselect clock digit if click in somewhere else
+            assert isinstance(selected_time_number, Digits)
+            self._remove_selection(selected_time_number)
+
     def action_move_up(self) -> None:
         """
         Action to increment current selected digit in the clock.
@@ -223,6 +246,17 @@ class Time(Widget, can_focus=True):
                 time_number.update(time_value)
                 self._update_time_if_changed()
 
+    def _remove_selection(self, time_number: Digits) -> None:
+        """
+        Remove Digit selection.
+
+        :param time_number: Digit Widget to remove selection.
+        """
+        if time_number.value.endswith("-"):
+            time_number.update(f"0{time_number.value[0]}")
+            self._update_time_if_changed()
+        time_number.remove_class("time-number-selected")
+
     def action_move_previous(self) -> None:
         """
         Action to move backward selected clock digit position.
@@ -234,10 +268,7 @@ class Time(Widget, can_focus=True):
             case 1:
                 time_number = query[0]
                 assert isinstance(time_number, Digits)
-                if time_number.value.endswith("-"):
-                    time_number.update(f"0{time_number.value[0]}")
-                    self._update_time_if_changed()
-                time_number.remove_class("time-number-selected")
+                self._remove_selection(time_number)
                 match time_number.id:
                     case "time-second":
                         self.get_widget_by_id("time-minute").add_class("time-number-selected")
@@ -255,10 +286,7 @@ class Time(Widget, can_focus=True):
             case 1:
                 time_number = query[0]
                 assert isinstance(time_number, Digits)
-                if time_number.value.endswith("-"):
-                    time_number.update(f"0{time_number.value[0]}")
-                    self._update_time_if_changed()
-                time_number.remove_class("time-number-selected")
+                self._remove_selection(time_number)
                 match time_number.id:
                     case "time-hour":
                         self.get_widget_by_id("time-minute").add_class("time-number-selected")
