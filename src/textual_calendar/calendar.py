@@ -4,7 +4,7 @@ import re
 from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import NamedTuple, Optional
+from typing import Any, NamedTuple, Optional
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -360,6 +360,17 @@ class Calendar(Widget, can_focus=True):
         :param date_value: Python date object to set this calendar.
         """
         self.calendar_date = CalendarDate(date_value.year, date_value.month, date_value.day)
+
+    def __init__(
+        self,
+        *children: Widget,
+        initial_date: Optional[date] = None,
+        **kwargs: Any,
+    ) -> None:
+        if initial_date is not None:
+            self.calendar_date = CalendarDate(
+                initial_date.year, initial_date.month, initial_date.day)
+        super().__init__(*children, **kwargs)
 
     async def _build_calendar(self) -> None:
         """
