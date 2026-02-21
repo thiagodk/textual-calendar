@@ -1,6 +1,9 @@
 
 from datetime import time
-from typing import Any, Literal, NamedTuple, Optional
+from typing import Any, Literal, NamedTuple, Optional, Union
+from typing import TYPE_CHECKING
+from zoneinfo import available_timezones
+from zoneinfo import ZoneInfo
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -8,7 +11,10 @@ from textual.events import Click
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Digits
+from textual.widgets import Digits, Select
+
+if TYPE_CHECKING:
+    from textual.types import NoSelection
 
 
 class ClockDigits(NamedTuple):
@@ -55,6 +61,11 @@ class Time(Widget, can_focus=True):
         color: $success;
         border-bottom: solid $secondary;
     }
+
+    Time Select {
+        width: 100%;
+        max-height: 10;
+    }
     """
 
     BINDINGS = [
@@ -75,8 +86,9 @@ class Time(Widget, can_focus=True):
     ]
 
     clock: ClockDigits
+    tz: Optional[Select[str]]
 
-    last_time_value: reactive[time] = reactive(time)
+    last_time_value: reactive[time] = reactive(time, always_update=True)
 
     class Changed(Message):
         """Posted when time in the clock changes."""
@@ -109,10 +121,17 @@ class Time(Widget, can_focus=True):
         hour = self.get_widget_by_id("time-hour", Digits)
         minute = self.get_widget_by_id("time-minute", Digits)
         second = self.get_widget_by_id("time-second", Digits)
+
         if hour.value.endswith("-") or minute.value.endswith("-") or second.value.endswith("-"):
             return None
+        tzinfo = None
+        if self.__show_tz:
+            tz = self.get_widget_by_id("time-tz", Select)
+            if tz.value != Select.BLANK:
+                assert isinstance(tz.value, str)
+                tzinfo = ZoneInfo(tz.value)
         try:
-            return time(int(hour.value), int(minute.value), int(second.value))
+            return time(int(hour.value), int(minute.value), int(second.value), tzinfo=tzinfo)
         except ValueError:
             return None
 
@@ -126,16 +145,21 @@ class Time(Widget, can_focus=True):
         self.clock.hour.update(f"{new_time.hour:02}")
         self.clock.minute.update(f"{new_time.minute:02}")
         self.clock.second.update(f"{new_time.second:02}")
+        if isinstance(new_time.tzinfo, ZoneInfo) and self.tz is not None:
+            self.tz.value = new_time.tzinfo.key
         self._update_time_if_changed()
 
     def __init__(
         self,
         *children: Widget,
         initial_time: Optional[time] = None,
+        show_tz: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(*children, **kwargs)
         self.initial_time = initial_time
+        self.__show_tz = show_tz
+        self.tz = None
 
     def compose(self) -> ComposeResult:
         initial_time = time(0, 0, 0) if self.initial_time is None else self.initial_time
@@ -143,6 +167,14 @@ class Time(Widget, can_focus=True):
             Digits(f"{initial_time.hour:02}", classes="time-number", id="time-hour"),
             Digits(f"{initial_time.minute:02}", classes="time-number", id="time-minute"),
             Digits(f"{initial_time.second:02}", classes="time-number", id="time-second"))
+        if self.__show_tz:
+            initial_tz: Union[str, NoSelection] = Select.BLANK
+            if isinstance(initial_time.tzinfo, ZoneInfo):
+                initial_tz = initial_time.tzinfo.key
+            self.tz = Select((
+                (tzname, tzname)
+                for tzname in available_timezones()),
+                value=initial_tz, prompt='Timezone', compact=True, id="time-tz")
         with Vertical():
             yield Horizontal(
                 self.clock.hour,
@@ -150,6 +182,8 @@ class Time(Widget, can_focus=True):
                 self.clock.minute,
                 Digits(":"),
                 self.clock.second)
+            if self.tz:
+                yield self.tz
 
     @staticmethod
     def move_time(time_number: Digits, direction: Literal["up", "down"]) -> Optional[str]:
@@ -217,7 +251,9 @@ class Time(Widget, can_focus=True):
         Update the last_time_value if the current time has changed.
         """
         time_value = self.time_value
-        if time_value is not None and time_value != self.last_time_value:
+        if time_value is not None and (
+                time_value != self.last_time_value or
+                time_value.tzinfo != self.last_time_value.tzinfo):
             self.last_time_value = time_value
 
     def on_click(self, event: Click) -> None:
@@ -241,6 +277,12 @@ class Time(Widget, can_focus=True):
             # Deselect clock digit if click in somewhere else
             assert isinstance(selected_time_number, Digits)
             self._remove_selection(selected_time_number)
+
+    def on_select_changed(self, _: Select.Changed) -> None:
+        """
+        Handle clock timezone changes.
+        """
+        self._update_time_if_changed()
 
     def action_move_up(self) -> None:
         """
@@ -340,5 +382,5 @@ class Time(Widget, can_focus=True):
         :param old_time: Previous time before change.
         :param new_time: New changed time.
         """
-        if old_time != new_time:
+        if old_time != new_time or old_time.tzinfo != new_time.tzinfo:
             self.post_message(self.Changed(self, new_time))
