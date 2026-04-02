@@ -1,9 +1,8 @@
 
 from datetime import time
-from typing import Any, Literal, NamedTuple, Optional, Union
-from typing import TYPE_CHECKING
+from typing import Any, Literal, NamedTuple, Optional
 from zoneinfo import available_timezones
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -11,10 +10,8 @@ from textual.events import Click
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Digits, Select
-
-if TYPE_CHECKING:
-    from textual.types import NoSelection
+from textual.widgets import Digits, Input
+from textual_autocomplete import AutoComplete
 
 
 class ClockDigits(NamedTuple):
@@ -86,7 +83,7 @@ class Time(Widget, can_focus=True):
     ]
 
     clock: ClockDigits
-    tz: Optional[Select[str]]
+    tz: Optional[Input]
 
     last_time_value: reactive[time] = reactive(time, always_update=True)
 
@@ -126,10 +123,12 @@ class Time(Widget, can_focus=True):
             return None
         tzinfo = None
         if self.__show_tz:
-            tz = self.get_widget_by_id("time-tz", Select)
-            if tz.value != Select.BLANK:
-                assert isinstance(tz.value, str)
-                tzinfo = ZoneInfo(tz.value)
+            tz = self.get_widget_by_id("time-tz", Input)
+            if tz.value:
+                try:
+                    tzinfo = ZoneInfo(tz.value)
+                except (ZoneInfoNotFoundError, ValueError):
+                    tzinfo = None
         try:
             return time(int(hour.value), int(minute.value), int(second.value), tzinfo=tzinfo)
         except ValueError:
@@ -168,13 +167,10 @@ class Time(Widget, can_focus=True):
             Digits(f"{initial_time.minute:02}", classes="time-number", id="time-minute"),
             Digits(f"{initial_time.second:02}", classes="time-number", id="time-second"))
         if self.__show_tz:
-            initial_tz: Union[str, NoSelection] = Select.BLANK
+            initial_tz: str = ""
             if isinstance(initial_time.tzinfo, ZoneInfo):
                 initial_tz = initial_time.tzinfo.key
-            self.tz = Select((
-                (tzname, tzname)
-                for tzname in available_timezones()),
-                value=initial_tz, prompt='Timezone', compact=True, id="time-tz")
+            self.tz = Input(initial_tz, placeholder="Timezone", id="time-tz")
         with Vertical():
             yield Horizontal(
                 self.clock.hour,
@@ -184,6 +180,7 @@ class Time(Widget, can_focus=True):
                 self.clock.second)
             if self.tz:
                 yield self.tz
+                yield AutoComplete(self.tz, candidates=list(available_timezones()))
 
     @staticmethod
     def move_time(time_number: Digits, direction: Literal["up", "down"]) -> Optional[str]:
@@ -278,7 +275,13 @@ class Time(Widget, can_focus=True):
             assert isinstance(selected_time_number, Digits)
             self._remove_selection(selected_time_number)
 
-    def on_select_changed(self, _: Select.Changed) -> None:
+    def on_input_changed(self, _: Input.Changed) -> None:
+        """
+        Handle clock timezone changes.
+        """
+        self._update_time_if_changed()
+
+    def on_input_submitted(self, _: Input.Submitted) -> None:
         """
         Handle clock timezone changes.
         """

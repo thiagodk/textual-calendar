@@ -7,7 +7,7 @@ name = "textual-calendar"
 description = "A calendar date/time picker widget for Textual UI."
 version = "1.0.0"
 requires-python = ">=3.11"
-license.text = "BSD-3-Clause"
+license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 keywords = [
   "textual",
@@ -33,6 +33,7 @@ authors = [
 ]
 dependencies = [
   "textual>=7.0.0",
+  "textual-autocomplete>=4.0.0",
 ]
 
 [tool.setuptools.packages.find]
