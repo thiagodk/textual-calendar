@@ -45,7 +45,7 @@ class DatetimePicker(Widget, can_focus=True):
 
         def __init__(
             self,
-            datetime_picker: DatetimePicker,
+            datetime_picker: "DatetimePicker",
             obj_change: Literal["date", "time"],
         ) -> None:
             super().__init__()
