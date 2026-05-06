@@ -45,6 +45,8 @@ dev = [
   "mypy",
   "pylint",
   "pylint-per-file-ignores",
+  "pytest",
+  "pytest-asyncio",
 ]
 
 [tool.mypy]
