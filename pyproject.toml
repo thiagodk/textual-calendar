@@ -26,6 +26,9 @@ classifiers = [
   "Intended Audience :: Developers",
   "Intended Audience :: Information Technology",
   "Topic :: Software Development :: User Interfaces",
+  "License :: OSI Approved :: BSD License",
+  "Operating System :: OS Independent",
+  "Framework :: Textual",
 ]
 readme = "README.md"
 authors = [
