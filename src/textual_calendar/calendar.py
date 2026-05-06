@@ -367,10 +367,10 @@ class Calendar(Widget, can_focus=True):
         initial_date: Optional[date] = None,
         **kwargs: Any,
     ) -> None:
+        super().__init__(*children, **kwargs)
         if initial_date is not None:
             self.calendar_date = CalendarDate(
                 initial_date.year, initial_date.month, initial_date.day)
-        super().__init__(*children, **kwargs)
 
     async def _build_calendar(self) -> None:
         """
